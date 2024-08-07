@@ -223,3 +223,168 @@ def plant_seed(farm, farmer_row, farmer_col):
         print(f"You planted a {seeds[seed]['name']} seed.")
     else:
         print("Invalid choice. Please select a valid option.")
+
+def harvest(farm, farmer_row, farmer_col):
+    if farm[farmer_row][farmer_col] is None:
+        print("There is nothing to harvest here.")
+        return
+    #check if the crop is ready for harvest
+    if isinstance(farm[farmer_row][farmer_col], list) and farm[farmer_row][farmer_col][1] == 0:
+        crop = farm[farmer_row][farmer_col][0]
+        #random amount to sell between 2 less and 2 more than the crop price
+        #Random selling price (2 more or 2 less from original selling price)
+        earned_money = random.randint(seeds[crop]['crop_price']-2, seeds[crop]['crop_price']+2)
+        game_vars['money'] += earned_money
+        farm[farmer_row][farmer_col] = None
+        game_vars['energy'] -= 1
+        print(f"You harvested {seeds[crop]['name']} and earned ${earned_money}.")
+    else:
+        print("This crop is not ready for harvest.")
+
+def end_day(game_vars):
+    # Increase the day count by 1
+    game_vars['day'] += 1
+    # Reset energy to 10 at the end of the day
+    game_vars['energy'] = 10
+    # Go through each row and column in the farm
+    for row in range(len(farm)):
+        for col in range(len(farm[row])):
+            # Check if there's something planted and it's not a House
+            if farm[row][col] is not None and farm[row][col] != 'House':
+                # Decrease the days to grow by 1 if it's more than 0
+                if farm[row][col][1] > 0:
+                    farm[row][col][1] -= 1
+                # If days to grow is 0, it means the crop is ready to harvest
+                elif farm[row][col][1] == 0:
+                    # Add money from the harvested crop to the player's money
+                    game_vars['money'] += seeds[farm[row][col][0]]['crop_price']
+                    # Remove the crop from the farm after harvesting
+                    farm[row][col] = None
+
+def save_game(game_vars, farm):
+    try:
+        with open("savegame.txt", "w") as file:
+            file.write(str(game_vars) + "\n")
+            file.write(str(farm) + "\n")
+        print("Game saved successfully!")
+    except Exception as e:
+        print(f"An error occurred while saving the game: {e}")
+
+def load_game(game_vars, farm):
+    try:
+        with open("savegame.txt", "r") as file:
+            #eval() takes a string and evaluates it as a Python expression. This means that if the string represents a Python data structure, eval() will convert the string back into that data structure.
+            game_vars.update(eval(file.readline().strip())) #eval to convert string to dictionary
+            loaded_farm = eval(file.readline().strip()) #eval to convert string to list
+            for i in range(len(farm)):
+                farm[i] = loaded_farm[i] #copying the loaded farm to the current farm
+        print("Game loaded successfully!")
+    except FileNotFoundError:
+        print("No saved game found. Starting a new game.")
+print("----------------------------------------------------------")
+print("Welcome to Stardew Farm!")
+print()
+print("You took out a loan to buy a small farm in Albatross Town.")
+print("You have 30 days to pay off your debt of $100.")
+print("You might even be able to make a little profit.")
+print("How successful will you be?")
+print("----------------------------------------------------------")
+
+print("1) Start a new game")
+print("2) Load your saved game")
+print()
+print("0) Exit Game")
+while True:
+    choice = input("Your choice? ")
+    if choice == "1":
+        break
+    elif choice == "2":
+        load_game(game_vars, farm)
+        break
+    elif choice == "0":
+        exit()
+    else:
+        print("Invalid choice. Please try again.")
+
+while game_vars['day'] <= 20:
+    in_town(game_vars)
+    choice = input("Your choice?")
+    if choice == "1":
+        in_shop(game_vars)
+    elif choice == "2":
+        farmer_row = 2
+        farmer_col = 2
+        energy = game_vars['energy']
+        while True:
+            draw_farm(farm, farmer_row, farmer_col, energy)
+            choice = input().strip()
+           
+            #Return to town
+            if choice.lower() == 'r':
+                print("Returning to Town...")
+                game_vars['energy'] = energy
+                break
+            
+            #Move function
+            elif choice.lower() in ['w', 'a', 's', 'd']: #check if the choice is a valid move
+                farmer_row, farmer_col = move(farmer_row, farmer_col, choice)
+                if energy == 0: energy = 0
+                else: energy -= 1
+            
+            #Plant function
+            elif choice.lower() == 'p': #if its p, plant the seed
+                plant_seed(farm, farmer_row, farmer_col)
+                if energy == 0: energy = 0
+                else: energy -= 1
+            
+            #Harvest function
+            elif choice.lower() == 'h': #if its h, harvest the crop
+                if game_vars['energy'] > 0:
+                    harvest(farm, farmer_row, farmer_col)
+                    energy -= 1
+            
+            #Invalid choice
+            else:
+                print("Invalid choice. Please enter W, A, S, D, P, or R.")
+            
+            #Check if energy is 0
+            if energy <= 0:
+                print("You're too tired. You should get back to town.") #if energy is 0, return to town
+                game_vars['energy'] = energy
+                break
+    
+    elif choice == "3":
+        end_day(game_vars)
+    
+    elif choice == "9":
+        save_game(game_vars, farm) 
+    
+    elif choice == "0":
+        exit()
+    
+    else:
+        print("Invalid choice. Please try again.")
+
+print("Game Over")
+if game_vars['money'] >= 100:
+    #If the player has more than $100, they have paid off their debt and made a profit
+    print("Congratulations! You have paid off your debt and made a profit!")
+    print(f"You have ${game_vars['money']-100} left as profit!")
+    #High score Board
+    name = input("Please enter your name: ")
+    with open("high_scores.txt", "a") as file:
+        file.write(f"{name}: {game_vars['money']}\n")
+    print("High scores:")
+    with open("high_scores.txt", "r") as file:
+        high_scores = file.readlines()
+        #The lambda function lambda x: int(x.split(":")[1].strip()) is applied to each element of high_scores to extract the score for sorting
+        #x.split(":"): Splits the string x at the colon :, resulting in a list like ["name", " score"]
+        #[1]: Accesses the second element of the list, which is the score with leading spaces
+        #.strip(): Removes any leading or trailing whitespace from the score
+        #int(...): Converts the score from a string to an integer for numerical comparison.
+        high_scores = sorted(high_scores, key=lambda x: int(x.split(":")[1].strip()), reverse=True) #sort in descending order
+        for i, score in enumerate(high_scores[:5], 1): #display the top 5 scores
+            print(f"{i}) {score.strip()}") #strip to remove leading and trailing whitespaces
+else:
+    print("You were unable to pay off your debt. Better luck next time!")
+    print(f"You were ${100-game_vars['money']} away from paying off your debt.") #display the amount the player was away from paying off the debt
